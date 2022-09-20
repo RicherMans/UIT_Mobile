@@ -1,0 +1,43 @@
+outputpath: experiments/superkws
+audioset_train_data: data/balanced_ssd.csv
+kws_train_data: data/xiaoai_train_hdf5_with_vad.csv
+audioset_eval_data: data/eval_ssd.csv
+kws_test_data: data/xiaoai_eval_hdf5_with_vad.csv
+num_classes: 528
+sampler: null
+mixup: null
+batch_size: 32
+optimizer: Adam8bit
+optimizer_args:
+    lr: 0.001
+    weight_decay: 0.0000005
+epochs: 500
+model: audio_transformer_h128_d6_m3
+model_args:
+  target_length: 300
+pretrained: pretrained/audio_transformer_h128_m3_d12_chunk10s_AS.pt
+epoch_length: 10000
+warmup_iters: 50000
+chunk_length: 3.0
+psl:
+  model: MobileNetV2
+  pretrained: pretrained/mobilenetv2_dm_mAP42_15.pt
+loss: BCELoss
+loss_args: {}
+spectransforms:
+    - TimeMasking:
+        time_mask_param: 36
+        iid_masks: True
+    - TimeMasking:
+        time_mask_param: 36
+        iid_masks: True
+    - FrequencyMasking:
+        freq_mask_param: 8
+        iid_masks: True
+    - FrequencyMasking:
+        freq_mask_param: 8
+        iid_masks: True
+wavtransforms:
+  Shift:
+    min_shift: -0.5
+    max_shift: 0.5
