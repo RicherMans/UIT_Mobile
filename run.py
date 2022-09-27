@@ -20,7 +20,7 @@ from ignite.handlers import (Checkpoint, DiskSaver, global_step_from_engine,
 # from evaluate import wensheng_eval,
 
 logger.configure(handlers=[{
-    "sink": sys.stderr,
+    "sink": sys.stdout,
     "format": "[<green>{time:YYYY-MM-DD HH:mm:ss}</green>] {message}",
     'level': 'DEBUG',
 }])
@@ -35,6 +35,10 @@ def transfer_to_device(batch, device=DEVICE):
 
 def log_basic_info(params):
     config_parameters = params['params']
+    import os
+    if 'HOSTNAME' in os.environ:
+        logger.info(f"Running on host {os.environ['HOSTNAME']}")
+
     logger.info(f"Running on device {DEVICE}")
     logger.info(f"Storing output in {params['outputdir']}")
     logger.info(f"- PyTorch version: {torch.__version__}")
@@ -104,7 +108,8 @@ class Runner(object):
         mixup_alpha: float = config_parameters.get('mixup', None)
         use_scheduler: bool = config_parameters.get('use_scheduler', True)
         num_classes: int = config_parameters.get('num_classes', 527)
-        sampler = config_parameters.get('sampler', None)
+        as_sampler = config_parameters.get('as_sampler', None)
+        kws_sampler = config_parameters.get('kws_sampler', None)
         use_mask = config_parameters.get('use_mask', True)
         pretrained_path = config_parameters.get('pretrained', None)
         spectransforms = utils.parse_spectransforms(
@@ -112,10 +117,9 @@ class Runner(object):
         wavtransforms = utils.parse_wavtransforms(
             config_parameters.get('wavtransforms', []))
         chunk_length = config_parameters.get('chunk_length', None)
-        separate_batch = config_parameters.get(
-            'separate_batch', False
-        )  # Separating batches, such that different lengths are forwarded twice
+        max_grad_norm = config_parameters.get('max_grad_norm', None)
         psl_model_params = config_parameters.get('psl')
+        basename = config_parameters.get('basename', True)
 
         model = getattr(models, config_parameters['model'])(
             spectransforms=spectransforms,
@@ -162,10 +166,10 @@ class Runner(object):
                 # calucate the maximum over the two original lengths
                 if lengths is not None:
                     lengths = utils.mixup_lengths(lengths)
-                model_pred, _ = model(x, mixup_lamb, mask=lengths)
+                model_pred, _ = model(x, mixup_lamb)
                 y = utils.mixup_single(y, mixup_lamb)
             else:
-                model_pred, _ = model(x, mask=lengths)
+                model_pred, _ = model(x)
             return criterion(model_pred, y)
 
         def _train_with_psl(engine, batch):
@@ -177,9 +181,9 @@ class Runner(object):
                 kws_x, kws_y, kws_lengths, *_ = transfer_to_device(
                     batch['kws'])
                 with torch.no_grad():
-                    y_teacher = psl_model(as_x.detach())
+                    y_teacher = psl_model(as_x).detach()
                 #Copy over the new labels from PSL
-                as_y[:, :527] = y_teacher[:, :527].detach()
+                as_y[:, :527] = y_teacher[:, :527]
                 x = torch.cat((as_x, kws_x), dim=0)
                 y = torch.cat((as_y, kws_y), dim=0)
                 lengths = torch.cat((as_lengths, kws_lengths), dim=0)
@@ -188,6 +192,8 @@ class Runner(object):
                     lengths = None
                 loss = _forward(x, y, lengths)
                 loss.backward()
+                if max_grad_norm is not None:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
                 optimizer.step()
                 return {
                     'total_loss': loss.item(),
@@ -203,7 +209,7 @@ class Runner(object):
                 # Only use PSL for the audioset dataset
                 if not use_mask:
                     lengths = None
-                loss = _forward(x, y, lengths)
+                loss = _forward(x, y)
                 loss.backward()
                 optimizer.step()
                 return {
@@ -217,7 +223,7 @@ class Runner(object):
                 data, targets, lengths, *_ = transfer_to_device(batch)
                 if not use_mask:
                     lengths = None
-                clip_out, _ = model(data, mask=lengths)
+                clip_out, _ = model(data)
                 return clip_out, targets
 
         def run_validation(engine, title=None):
@@ -235,7 +241,7 @@ class Runner(object):
 
         train_engine = create_engine(
             _default_train_batch if psl_model is None else _train_with_psl)
-        inference_audioset_engine = create_engine(
+        inference_engine = create_engine(
             _inference,
             evaluation_metrics=['mAP'])  # Common mAP between all datasets
 
@@ -253,7 +259,7 @@ class Runner(object):
             f"Mixing with KWS data Train: {config_parameters['kws_train_data']} Test: {config_parameters['kws_test_data']}"
         )
         kws_train_df = utils.read_tsv_data(config_parameters['kws_train_data'],
-                                           basename=True)
+                                           basename=basename)
 
         if psl_model is None and chunk_length is None:
             kws_ds = dataset.WeakHDF5Dataset(kws_train_df,
@@ -271,28 +277,38 @@ class Runner(object):
                 num_classes=num_classes)
 
         kws_eval_df = utils.read_tsv_data(config_parameters['kws_test_data'],
-                                          basename=True)
+                                          basename=basename)
         test_df = pd.concat((audioset_eval_df, kws_eval_df))
-        mAPAudioset = utils.ALL_EVAL_METRICS['mAP_transform'](
-            lambda x: (x[0][..., :527], x[1][..., :527]))
-        mAPAudioset.attach(inference_audioset_engine, 'mAPAudioset')
-        mAPKWS = utils.ALL_EVAL_METRICS['mAP_transform'](
-            lambda x: (x[0][..., 527:], x[1][..., 527:]))
-        mAPKWS.attach(inference_audioset_engine, 'mAPKWS')
+        mAPAudioset = utils.ALL_EVAL_METRICS['AP']()[:527].mean()
+        mAPAudioset.attach(inference_engine, 'mAPAudioset')
+        mAPKWS = utils.ALL_EVAL_METRICS['AP']()[527:].mean()
+        mAPKWS.attach(inference_engine, 'mAPKWS')
+
+        as_sampeler_kwargs = {'shuffle':True}
+        kws_sampeler_kwargs = {'shuffle': True}
+        if as_sampler is not None and as_sampler == 'balanced':
+            as_sampeler_kwargs = {
+                'sampler': dataset.BalancedSampler(audioset_train_df['labels'])
+            }
+        if kws_sampler is not None and kws_sampler == 'balanced':
+            kws_sampeler_kwargs = {
+                'sampler': dataset.BalancedSampler(kws_train_df['labels'])
+            }
 
         train_dataloader = dataset.MultiDataLoader(
-            kws=torch.utils.data.DataLoader(kws_ds,
-                                            batch_size=kws_batch_size,
-                                            num_workers=num_workers,
-                                            collate_fn=dataset.sequential_pad,
-                                            shuffle=True,
-                                            ),
+            kws=torch.utils.data.DataLoader(
+                kws_ds,
+                batch_size=kws_batch_size,
+                num_workers=num_workers,
+                collate_fn=dataset.sequential_pad,
+                **kws_sampeler_kwargs,
+            ),
             audioset=torch.utils.data.DataLoader(
                 audioset_ds,
                 batch_size=as_batch_size,
                 num_workers=num_workers,
-                shuffle=True,
-                collate_fn=dataset.sequential_pad))
+                collate_fn=dataset.sequential_pad,
+                **as_sampeler_kwargs))
 
         test_dataloader = torch.utils.data.DataLoader(
             dataset.WeakHDF5Dataset(test_df, num_classes=num_classes),
@@ -330,53 +346,57 @@ class Runner(object):
                 )
                 scheduler = create_lr_scheduler_with_warmup(
                     scheduler,
-                    warmup_start_value=optimizer.param_groups[0]['lr'] * 0.01,
+                    warmup_start_value=0.0,
                     warmup_duration=warmup_iters)
             train_engine.add_event_handler(Events.ITERATION_STARTED, scheduler)
         earlystop_handler = EarlyStopping(patience=early_stop,
                                           score_function=score_function,
                                           trainer=train_engine)
         # Stop on Wensheng no improvement
-        inference_audioset_engine.add_event_handler(Events.COMPLETED,
+        inference_engine.add_event_handler(Events.COMPLETED,
                                                     earlystop_handler)
 
-        inference_audioset_engine.add_event_handler(Events.COMPLETED,
+        inference_engine.add_event_handler(Events.COMPLETED,
                                                     checkpoint_saver)
 
         @train_engine.on(
             Events.EPOCH_COMPLETED(
                 every=config_parameters.get('valid_every', 1)))
         def valid_eval(train_engine):
-            with inference_audioset_engine.add_event_handler(
+            with inference_engine.add_event_handler(
                     Events.COMPLETED, run_validation, "Validation"):
-                inference_audioset_engine.run(test_dataloader)
+                inference_engine.run(test_dataloader)
+
+
+        @train_engine.on(Events.COMPLETED)
+        def average_models_and_eval(engine):
+            output_model = outputdir / checkpoint_saver.last_checkpoint
+            if config_parameters.get('average', True):
+                logger.info("Averaging best models ...")
+                output_model = outputdir / 'averaged.pt'
+
+                averaged_state_dict = utils.average_models(
+                    [outputdir / f.filename for f in checkpoint_saver._saved])
+                torch.save(averaged_state_dict, output_model)
+
+                model.load_state_dict(averaged_state_dict['model'],
+                                      strict=True)
+            else:
+                logger.info(f"Loading best model {output_model}")
+                model.load_state_dict(torch.load(output_model)['model'],
+                                      strict=True)
+            #Final evaluation
+            valid_eval(engine)
+            engine.state.output_model = output_model
+            logger.info(f"Results can be found at {outputdir}")
+            logger.info(f"Final model is at {engine.state.output_model}")
 
         train_engine.run(
             train_dataloader,
             max_epochs=epochs,
             epoch_length=epoch_length,
         )
-        output_model = outputdir / checkpoint_saver.last_checkpoint
-        if config_parameters.get('average', True):
-            logger.info("Averaging best models ...")
-            output_model = outputdir / 'averaged.pt'
-
-            averaged_state_dict = utils.average_models(
-                [outputdir / f.filename for f in checkpoint_saver._saved])
-            torch.save(averaged_state_dict, output_model)
-
-            model.load_state_dict(averaged_state_dict['model'], strict=True)
-        else:
-            logger.info(f"Loading best model {output_model}")
-            model.load_state_dict(torch.load(output_model)['model'],
-                                  strict=True)
-        # with inference_wensheng_engine.add_event_handler(Events.COMPLETED,
-        with inference_audioset_engine.add_event_handler(
-                Events.COMPLETED, run_validation, "Wensheng"):
-            inference_audioset_engine.run(test_dataloader)
-        logger.info(f"Results can be found at {outputdir}")
-        return output_model
-
+        return train_engine.state.output_model
 
     def run(self, config, **kwargs):
         output_dir = self.train(config, **kwargs)

@@ -81,7 +81,12 @@ class WeakRandomCropHDF5Dataset(WeakHDF5Dataset):
         else:
             load_data = self._datasetcache[hdf5path][f"{fname}"][:]
             data = np.zeros(self.chunk_length, dtype=load_data.dtype)
-            data[:load_data.shape[0]] = load_data
+            data_length = load_data.shape[-1]
+            start_idx = 0
+            #Randomly insert into array if longer
+            if self.chunk_length - data_length > 0:
+                start_idx = np.random.randint(0, self.chunk_length - data_length)
+            data[start_idx:start_idx+data_length] = load_data
         if np.issubdtype(data.dtype, np.integer):
             data = (data/32768.).astype('float32')
         return torch.as_tensor(data, dtype=torch.float32)

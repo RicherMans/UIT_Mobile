@@ -1,8 +1,8 @@
 outputpath: experiments/superkws
 audioset_train_data: data/balanced_ssd.csv
-kws_train_data: data/xiaoai_train_hdf5_with_vad.csv
+kws_train_data: data/train/xiaoai_train.tsv
 audioset_eval_data: data/eval_ssd.csv
-kws_test_data: data/xiaoai_eval_hdf5_with_vad.csv
+kws_test_data: data/test/test_xiaoai.tsv
 num_classes: 528
 sampler: null
 mixup: null

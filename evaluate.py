@@ -35,6 +35,7 @@ class Evaluator(object):
                 outputdim=self.num_classes, **config_parameters['model_args'])
             self.model = self.model.to(DEVICE).eval()
             self.model = utils.load_pretrained(self.model, model_dump['model'])
+            self.config = config_parameters
         return self
 
     def _inference(self, engine, batch, pad=False) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -49,7 +50,7 @@ class Evaluator(object):
                             (t_len - input_nframes) * self.model.hop_size)
                         data = torch.nn.functional.pad(data, (0, diff),
                                                        mode='constant')
-            clip_out, _ = self.model(data, mask=lengths)
+            clip_out, _ = self.model(data)
             return clip_out, targets
 
     def audioset(self,
@@ -168,18 +169,20 @@ class Evaluator(object):
                                                 "Audioset Eval"):
             inference_engine.run(test_dataloader)
 
-    def xiaoai(self,
-                 experiment_path: str,
-                 eval_data: str = 'data/xiaoai_eval_hdf5_with_vad_onelabel.csv',
-                 threshold:float =0.4,
-                 batch_size=32,
-                 label_name='Xiaoai',
-                 pad:bool=False, # Padding to target length
-                 ):
+    def xiaoai(
+            self,
+            experiment_path: str,
+            eval_data: str = 'data/xiaoai_eval_hdf5_with_vad_onelabel.csv',
+            threshold: float = 0.4,
+            batch_size=32,
+            label_name='Xiaoai',
+            pad: bool = False,  # Padding to target length
+    ):
         self.__setup_eval(experiment_path)
         if pad:
             logger.info("Using Padding")
-        df = utils.read_tsv_data(eval_data)
+        df = utils.read_tsv_data(eval_data,
+                                 basename=self.config.get('basename', True))
         dataloader = torch.utils.data.DataLoader(
             dataset.WeakHDF5Dataset(df, num_classes=self.num_classes),
             batch_size=batch_size,
@@ -234,6 +237,31 @@ class Evaluator(object):
                 label_name=fname,
                 **kwargs,
             )
+
+    def gsc(
+            self,
+            experiment_path: str,
+            eval_data: str = 'data/gsc_cluster/test_11class.csv',
+            **kwargs
+            ):
+        self.xiaoai(
+            experiment_path=experiment_path,
+            eval_data=eval_data,
+            label_name='GSC',
+            **kwargs,
+        )
+    def gsc30(
+            self,
+            experiment_path: str,
+            eval_data: str = 'data/gsc/test_30class.csv',
+            **kwargs
+            ):
+        self.xiaoai(
+            experiment_path=experiment_path,
+            eval_data=eval_data,
+            label_name='GSC30',
+            **kwargs,
+        )
 
     def test_sample(
         self,

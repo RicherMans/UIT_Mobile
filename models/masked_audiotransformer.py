@@ -441,12 +441,10 @@ class AudioTransformer(nn.Module):
         x = rearrange(x, 'b f t -> b 1 f t')
         if self.init_bn is not None:
             x = self.init_bn(x)
-        if x.shape[-1] > self.target_length:
+        if (x.shape[-1] > self.target_length) and (self.target_length - x.shape[-1] > x.shape[-1] // 2):
+            print("True")
             #When testing with a longer input
             outs = []
-            # splits = x.unfold(-1, self.target_length,
-            # 16).permute(3, 0, 1, 2, 4)
-            # for f in splits:
             for f in x.split(self.target_length, -1):
                 # Pad zeros for usually last chunk, that we have self.target_length assured
                 if f.shape[-1] != self.target_length:
@@ -471,8 +469,14 @@ class AudioTransformer(nn.Module):
                 att = att / att.sum(1, keepdims=True)
                 x = (att * x).sum(1)
             else:
-                raise ValueError(f'Unknown Eval average function ({self.eval_avg})')
-
+                raise ValueError(
+                    f'Unknown Eval average function ({self.eval_avg})')
+        elif x.shape[-1] > self.target_length and (
+                self.target_length - x.shape[-1] < 10 ):
+            x = x[..., :self.target_length]
+            # No mask since mask can be longer here than the original input
+            x = self.forward_features(x, mask=None)
+            x = self.forward_head(x, None)
         else:
             patch_mask, length_mask = None, None
             if mask is not None:
