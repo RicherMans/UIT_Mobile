@@ -176,3 +176,25 @@ class MobileNetV2(nn.Module):
         x = x.flatten(-2).transpose(1,2)
         x = self.classifier(x).sigmoid()
         return x.mean(1)
+
+
+def test_memory_requirement(mdl):
+    x = torch.randn(1, 16000).cuda()
+    torch.cuda.reset_peak_memory_stats()
+    mdl(x)
+    memory_usage = torch.cuda.memory_stats()["allocated_bytes.all.peak"]
+    return memory_usage / 1024 ** 2
+
+
+
+if __name__ == "__main__":
+    from torchinfo import summary
+    models_to_test = [
+        'MobileNetV2',
+    ]
+    for mdl in models_to_test:
+        trans = globals()[mdl]()
+        trans.eval()
+        trans.to('cuda')
+        memory_usage = test_memory_requirement(trans)
+        print(f"{mdl} Peak memory requirement: {memory_usage:.2f} MB")

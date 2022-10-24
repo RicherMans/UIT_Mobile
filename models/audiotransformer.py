@@ -289,6 +289,41 @@ class BNeckAttentionV3(nn.Module):
         x = self.proj_drop(x)
         return x
 
+class BNeckAttentionV4(nn.Module):
+    def __init__(self,
+                 dim,
+                 num_heads=8,
+                 qkv_bias=False,
+                 attn_drop=0.,
+                 proj_drop=0.):
+        super().__init__()
+        assert dim % num_heads == 0, 'dim should be divisible by num_heads'
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim**-0.5
+        self.inner_dim = dim // 2
+
+        self.qkv = nn.Linear(dim, self.inner_dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(self.inner_dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, x):
+        B, N, *_ = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads,
+                                  self.inner_dim // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(
+            0)  # make torchscript happy (cannot use tensor as tuple)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, self.inner_dim)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
 class BNeckAttention(nn.Module):
     def __init__(self,
                  dim,
@@ -803,13 +838,16 @@ class AudioTransformer(nn.Module):
             # for f in splits:
             # Just drop the last sample, enhances performance
             for f in x.split(self.target_length, -1):
-                # Pad zeros for usually last chunk, that we have self.target_length assured
                 if f.shape[-1] != self.target_length:
-                    continue
-                    # pad = torch.zeros((*x.shape[:-1], self.target_length),
-                                      # device=x.device)
-                    # pad[..., :f.shape[-1]] = f
-                    # f = pad
+                    f = x[..., -self.target_length:]
+                    # Just crop last step
+                # Pad zeros for usually last chunk, that we have self.target_length assured
+                # if f.shape[-1] != self.target_length:
+                # continue
+                # pad = torch.zeros((*x.shape[:-1], self.target_length),
+                # device=x.device)
+                # pad[..., :f.shape[-1]] = f
+                # f = pad
                 outs.append(self.forward_head(self.forward_features(f)))
             x = torch.stack(outs,-1)
             if self.eval_avg == 'mean':
@@ -906,6 +944,7 @@ class AudioTransformer_Pool(AudioTransformer):
                         Rearrange('b d t -> b t d'),
                     ))
         self.blocks = nn.Sequential(*blocks)
+
 
 class AudioTransformer_LinFormer(AudioTransformer):
     def __init__(self,
@@ -1245,6 +1284,24 @@ def audio_transformer_h128_d2_m3(**kwargs):
     model_kwargs = {**model_kwargs, **kwargs}
     return AudioTransformer(**model_kwargs)
 
+def audio_transformer_h128_d12_m3_bneckv4_relu(**kwargs):
+    model_kwargs = dict(
+        patch_size=16,
+        embed_dim=128,
+        depth=12,
+        num_heads=2,
+        mlp_ratio=3.0,
+        pooling='mean',
+        init_bn=True,
+        drop_path_rate=0.0,
+        act_layer=nn.ReLU,
+        attention_type='BNeckAttentionV4',
+    )
+    model_kwargs.update(
+        (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
+    model_kwargs = {**model_kwargs, **kwargs}
+    return AudioTransformer(**model_kwargs)
+
 def audio_transformer_h128_d12_m3_bneck_relu(**kwargs):
     model_kwargs = dict(
         patch_size=16,
@@ -1371,6 +1428,24 @@ def audio_transformer_tiny(**kwargs):
     model_kwargs = {**model_kwargs, **kwargs}
     return AudioTransformer(**model_kwargs)
 
+def audio_transformer_h128_d4_m3_bneckv4_relu(**kwargs):
+    model_kwargs = dict(
+        patch_size=16,
+        embed_dim=128,
+        depth=4,
+        num_heads=2,
+        mlp_ratio=3.0,
+        pooling='mean',
+        init_bn=True,
+        drop_path_rate=0.0,
+        act_layer=nn.ReLU,
+        attention_type='BNeckAttentionV4',
+    )
+    model_kwargs.update(
+        (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
+    model_kwargs = {**model_kwargs, **kwargs}
+    return AudioTransformer(**model_kwargs)
+
 def audio_transformer_h128_d4_m3_bneck_relu(**kwargs):
     model_kwargs = dict(
         patch_size=16,
@@ -1419,6 +1494,24 @@ def audio_transformer_h128_d6_m2_bneck_relu(**kwargs):
         drop_path_rate=0.0,
         act_layer=nn.ReLU,
         attention_type='BNeckAttention',
+    )
+    model_kwargs.update(
+        (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
+    model_kwargs = {**model_kwargs, **kwargs}
+    return AudioTransformer(**model_kwargs)
+
+def audio_transformer_h128_d6_m3_bneckv4_relu(**kwargs):
+    model_kwargs = dict(
+        patch_size=16,
+        embed_dim=128,
+        depth=6,
+        num_heads=2,
+        mlp_ratio=3.0,
+        pooling='mean',
+        init_bn=True,
+        drop_path_rate=0.0,
+        act_layer=nn.ReLU,
+        attention_type='BNeckAttentionV4',
     )
     model_kwargs.update(
         (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
@@ -1496,6 +1589,78 @@ def audio_transformer_h128_d3_m3_bneck_relu_lin(**kwargs):
     model_kwargs = {**model_kwargs, **kwargs}
     return AudioTransformer_Pool(**model_kwargs)
 
+def audio_transformer_h128_d6_m3_pool(**kwargs):
+    model_kwargs = dict(
+        patch_size=16,
+        embed_dim=128,
+        depth=6,
+        num_heads=2,
+        mlp_ratio=3.0,
+        pooling='mean',
+        init_bn=True,
+        drop_path_rate=0.0,
+        act_layer=nn.ReLU,
+        pool_idxs = [1,3],
+    )
+    model_kwargs.update(
+        (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
+    model_kwargs = {**model_kwargs, **kwargs}
+    return AudioTransformer_Pool(**model_kwargs)
+
+def audio_transformer_h128_d12_m3_pool(**kwargs):
+    model_kwargs = dict(
+        patch_size=16,
+        embed_dim=128,
+        depth=12,
+        num_heads=2,
+        mlp_ratio=3.0,
+        pooling='mean',
+        init_bn=True,
+        drop_path_rate=0.0,
+        act_layer=nn.ReLU,
+        pool_idxs = [1,5],
+    )
+    model_kwargs.update(
+        (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
+    model_kwargs = {**model_kwargs, **kwargs}
+    return AudioTransformer_Pool(**model_kwargs)
+
+def audio_transformer_h128_d6_m3_bneck_pool(**kwargs):
+    model_kwargs = dict(
+        patch_size=16,
+        embed_dim=128,
+        depth=6,
+        num_heads=2,
+        mlp_ratio=3.0,
+        pooling='mean',
+        init_bn=True,
+        drop_path_rate=0.0,
+        act_layer=nn.ReLU,
+        pool_idxs = [1,3],
+    )
+    model_kwargs.update(
+        (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
+    model_kwargs = {**model_kwargs, **kwargs}
+    return AudioTransformer_Pool(**model_kwargs)
+
+def audio_transformer_h128_d4_m3_pool(**kwargs):
+    model_kwargs = dict(
+        patch_size=16,
+        embed_dim=128,
+        depth=4,
+        num_heads=2,
+        mlp_ratio=3.0,
+        pooling='mean',
+        init_bn=True,
+        drop_path_rate=0.0,
+        act_layer=nn.ReLU,
+        pool_idxs = [1,2],
+    )
+    model_kwargs.update(
+        (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
+    model_kwargs = {**model_kwargs, **kwargs}
+    return AudioTransformer_Pool(**model_kwargs)
+
 def audio_transformer_h128_d3_m3_bneck_relu_pool(**kwargs):
     model_kwargs = dict(
         patch_size=16,
@@ -1514,23 +1679,6 @@ def audio_transformer_h128_d3_m3_bneck_relu_pool(**kwargs):
     model_kwargs = {**model_kwargs, **kwargs}
     return AudioTransformer_Pool(**model_kwargs)
 
-def audio_transformer_h128_d6_m3_bneck_relu_pool(**kwargs):
-    model_kwargs = dict(
-        patch_size=16,
-        embed_dim=128,
-        depth=6,
-        num_heads=2,
-        mlp_ratio=3.0,
-        pooling='mean',
-        init_bn=True,
-        drop_path_rate=0.0,
-        act_layer=nn.ReLU,
-        attention_type='BNeckAttention',
-    )
-    model_kwargs.update(
-        (k, kwargs[k]) for k in set(kwargs).intersection(model_kwargs))
-    model_kwargs = {**model_kwargs, **kwargs}
-    return AudioTransformer_Pool(**model_kwargs)
 
 def audio_transformer_h128_d3_m3_h1_bneck_relu(**kwargs):
     model_kwargs = dict(
@@ -1629,18 +1777,49 @@ def audio_transformer_s(**kwargs):
     return AudioTransformer(**model_kwargs)
 
 
+def b2mb(x): return int(x/2**20)
+class TorchTracemalloc():
+
+    def __enter__(self):
+        self.begin = torch.cuda.memory_allocated()
+        torch.cuda.reset_max_memory_allocated() # reset the peak gauge to zero
+        return self
+
+    def __exit__(self, *exc):
+        self.end = torch.cuda.memory_allocated()
+        self.peak = torch.cuda.max_memory_allocated()
+        self.used = b2mb(self.end - self.begin)
+        self.peaked = b2mb(self.peak - self.begin)
+        print(self.used, self.peaked, self.end, self.begin)
+        print(f"delta used/peak {self.used:4d}/{self.peaked:4d}")
+
+
+def test_memory_requirement(mdl):
+    x = torch.randn(1, 16000).cuda()
+    torch.cuda.reset_peak_memory_stats()
+    mdl(x)
+    memory_usage = torch.cuda.memory_stats()["allocated_bytes.all.peak"]
+    return memory_usage / 1024 ** 2
+
+
+
 if __name__ == "__main__":
     from torchinfo import summary
-    # att = LiteAttention(128, num_heads=1)
-    # x = torch.randn(1, 100, 128)
-    # att(x)
-    # trans = audio_transformer_h128_d3_m3_relu_nonorm(target_length=200)
-    # trans = audio_transformer_h128_d4_m3_bneck_relu(target_length=201)
-    trans = audio_transformer_h128_d6_m2_bneck_relu(target_length=201)
-    x = torch.randn(4, 32000)
-    x1 = trans.front_end(x)
-    trans.eval()
-    summary(trans, input_size=x.shape, device='cpu')
-    y, _ = trans(x)
-    torch.save(trans.state_dict(), '/tmp/mdl.pt')
+    models_to_test = [
+        'audio_transformer_h128_d4_m3_bneck_relu',
+        'audio_transformer_h128_d4_m3_relu',
+        'audio_transformer_h128_d4_m3',
+        'audio_transformer_h128_d6_m3_bneck_relu',
+        'audio_transformer_h128_d6_m3_relu',
+        'audio_transformer_h128_d6_m3',
+        'audio_transformer_h128_d12_m3_bneck_relu',
+        'audio_transformer_h128_d12_m3_relu',
+        'audio_transformer_h128_d12_m3',
+    ]
+    for mdl in models_to_test:
+        trans = globals()[mdl](target_length=102)
+        trans.eval()
+        trans.to('cuda')
+        memory_usage = test_memory_requirement(trans)
+        print(f"{mdl} Peak memory requirement: {memory_usage:.2f} MB")
     # print(y.shape)

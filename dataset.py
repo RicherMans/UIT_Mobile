@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from loguru import logger
 from typing import Tuple, List,Any
+import random
 from pathlib import Path
 from typing import Sequence
 import pandas as pd
@@ -76,7 +77,7 @@ class WeakRandomCropHDF5Dataset(WeakHDF5Dataset):
             self._datasetcache[hdf5path] = File(hdf5path, 'r')
         data_shape = self._datasetcache[hdf5path][f"{fname}"].shape[-1]
         if data_shape > self.chunk_length:
-            start_idx = np.random.randint(0,data_shape - self.chunk_length)
+            start_idx = random.randint(0,data_shape - self.chunk_length - 1)
             data = self._datasetcache[hdf5path][f"{fname}"][start_idx:start_idx+self.chunk_length]
         else:
             load_data = self._datasetcache[hdf5path][f"{fname}"][:]
@@ -85,7 +86,7 @@ class WeakRandomCropHDF5Dataset(WeakHDF5Dataset):
             start_idx = 0
             #Randomly insert into array if longer
             if self.chunk_length - data_length > 0:
-                start_idx = np.random.randint(0, self.chunk_length - data_length)
+                start_idx = random.randint(0, self.chunk_length - data_length - 1)
             data[start_idx:start_idx+data_length] = load_data
         if np.issubdtype(data.dtype, np.integer):
             data = (data/32768.).astype('float32')
@@ -156,7 +157,7 @@ class UnlabeledRandomChunkedHDF5Dataset(torch.utils.data.Dataset):
             self._datasetcache[hdf5path] = File(hdf5path, 'r')
         data_shape = self._datasetcache[hdf5path][f"{fname}"].shape[-1]
         if data_shape > self.chunk_length:
-            start_idx = np.random.randint(0,data_shape - self.chunk_length)
+            start_idx = random.randint(0,data_shape - self.chunk_length - 1)
             data = self._datasetcache[hdf5path][f"{fname}"][start_idx:start_idx+self.chunk_length]
         else:
             load_data = self._datasetcache[hdf5path][f"{fname}"][:]

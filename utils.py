@@ -345,7 +345,8 @@ def read_tsv_data(datafile: str, nrows: int = None, basename=True):
     else:
         df['labels'] = df['labels'].apply(lambda x: [int(x)])
     if basename:
-        df['filename'] = df['filename'].apply(lambda x: Path(x).name)
+        # Just a hack to allow both GSC and audioset in one dataframe ....
+        df['filename'] = df['filename'].apply(lambda x: x if 'Google_Speech_Commands' in x else Path(x).name)
     return df
 
 

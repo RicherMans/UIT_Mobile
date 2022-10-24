@@ -94,16 +94,17 @@ class Runner(object):
 
     def train(self, config, **overwrite_kwargs):
         param_dict = self.__setup(config, **overwrite_kwargs)
-        config_parameters = param_dict['params']
-        outputdir = param_dict['outputdir']
-        epochs = config_parameters['epochs']
-        epoch_length = config_parameters['epoch_length']
-        warmup_iters = config_parameters['warmup_iters']
-        batch_size = config_parameters['batch_size']
-        num_workers = config_parameters['num_workers']
-        kws_batch_size = config_parameters.get('kws_batch_size',
-                                               batch_size // 2)
-        as_batch_size = config_parameters.get('as_batch_size', batch_size // 2)
+        config_parameters:Dict = param_dict['params']
+        outputdir:str = param_dict['outputdir']
+        epochs:int = config_parameters['epochs']
+        epoch_length:int = config_parameters['epoch_length']
+        warmup_iters:int = config_parameters['warmup_iters']
+        batch_size:int = config_parameters['batch_size']
+        num_workers:int = config_parameters['num_workers']
+        kws_batch_size: int = config_parameters.get('kws_batch_size',
+                                                    batch_size // 2)
+        as_batch_size: int = config_parameters.get('as_batch_size',
+                                                   batch_size // 2)
         early_stop: int = config_parameters.get('early_stop', 10)
         mixup_alpha: float = config_parameters.get('mixup', None)
         use_scheduler: bool = config_parameters.get('use_scheduler', True)
@@ -116,8 +117,8 @@ class Runner(object):
             config_parameters.get('spectransforms', []))
         wavtransforms = utils.parse_wavtransforms(
             config_parameters.get('wavtransforms', []))
-        chunk_length = config_parameters.get('chunk_length', None)
-        max_grad_norm = config_parameters.get('max_grad_norm', None)
+        chunk_length: float = config_parameters.get('chunk_length', None)
+        max_grad_norm: bool = config_parameters.get('max_grad_norm', None)
         psl_model_params = config_parameters.get('psl')
         basename = config_parameters.get('basename', True)
 
@@ -353,20 +354,18 @@ class Runner(object):
                                           score_function=score_function,
                                           trainer=train_engine)
         # Stop on Wensheng no improvement
-        inference_engine.add_event_handler(Events.COMPLETED,
-                                                    earlystop_handler)
+        inference_engine.add_event_handler(Events.COMPLETED, earlystop_handler)
 
-        inference_engine.add_event_handler(Events.COMPLETED,
-                                                    checkpoint_saver)
+        inference_engine.add_event_handler(Events.COMPLETED, checkpoint_saver)
 
         @train_engine.on(
             Events.EPOCH_COMPLETED(
                 every=config_parameters.get('valid_every', 1)))
         def valid_eval(train_engine):
-            with inference_engine.add_event_handler(
-                    Events.COMPLETED, run_validation, "Validation"):
+            with inference_engine.add_event_handler(Events.COMPLETED,
+                                                    run_validation,
+                                                    "Validation"):
                 inference_engine.run(test_dataloader)
-
 
         @train_engine.on(Events.COMPLETED)
         def average_models_and_eval(engine):

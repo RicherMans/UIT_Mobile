@@ -250,12 +250,11 @@ class Evaluator(object):
             label_name='GSC',
             **kwargs,
         )
-    def gsc30(
-            self,
-            experiment_path: str,
-            eval_data: str = 'data/gsc/test_30class.csv',
-            **kwargs
-            ):
+
+    def gsc30(self,
+              experiment_path: str,
+              eval_data: str = 'data/gsc/test_30class_singlelabel.csv',
+              **kwargs):
         self.xiaoai(
             experiment_path=experiment_path,
             eval_data=eval_data,

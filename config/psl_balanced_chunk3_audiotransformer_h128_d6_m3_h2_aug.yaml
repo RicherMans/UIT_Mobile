@@ -11,11 +11,11 @@ optimizer: Adam8bit
 optimizer_args:
     lr: 0.001
     weight_decay: 0.0000005
-epochs: 1000
-early_stop: 1000
+epochs: 500
+early_stop: 20
 model: audio_transformer_h128_d6_m3_relu
 model_args:
-  target_length: 301
+  target_length: 305
 pretrained: pretrained/audio_transformer_h128_m3_d12_chunk10s_AS.pt
 epoch_length: 10000
 warmup_iters: 1000
