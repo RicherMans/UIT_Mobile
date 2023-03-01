@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict, Any, Union
+from typing import List, Tuple, Dict, Any, Union, Callable, Iterable, Optional
 from loguru import logger
 from fire import Fire
 import pandas as pd
@@ -17,7 +17,6 @@ from ignite.contrib.handlers import ProgressBar, create_lr_scheduler_with_warmup
 from ignite.engine import (Engine, Events)
 from ignite.handlers import (Checkpoint, DiskSaver, global_step_from_engine,
                              EarlyStopping)
-# from evaluate import wensheng_eval,
 
 logger.configure(handlers=[{
     "sink": sys.stdout,
@@ -28,8 +27,8 @@ logger.configure(handlers=[{
 DEVICE = torch.device('cpu' if not torch.cuda.is_available() else 'cuda')
 
 
-def transfer_to_device(batch, device=DEVICE):
-    return (x.to(DEVICE, non_blocking=True)
+def transfer_to_device(batch: Iterable, device=DEVICE):
+    return (x.to(device, non_blocking=True)
             if isinstance(x, torch.Tensor) else x for x in batch)
 
 
@@ -50,7 +49,8 @@ def log_basic_info(params):
         logger.info(f"{k} : {v}")
 
 
-def create_engine(engine_function, evaluation_metrics: List[str] = None):
+def create_engine(engine_function: Callable,
+                  evaluation_metrics: Optional[List[str]] = None):
     engine = Engine(engine_function)
     ProgressBar().attach(engine, output_transform=lambda x: x)
 
@@ -62,6 +62,7 @@ def create_engine(engine_function, evaluation_metrics: List[str] = None):
 
 
 class Runner(object):
+
     def __init__(self, seed: int = 42, nthreads: int = 1):
         super().__init__()
         torch.manual_seed(seed)
@@ -69,8 +70,8 @@ class Runner(object):
         torch.set_num_threads(nthreads)
 
     def __setup(self,
-                config: Path,
-                default_args=utils.DEFAULT_ARGS,
+                config: Union[Path, str],
+                default_args: Dict[str, Any] = utils.DEFAULT_ARGS,
                 **override_kwargs) -> Dict[str, Any]:
         config_parameters = utils.parse_config_or_kwargs(
             config, default_args=default_args, **override_kwargs)
@@ -92,15 +93,16 @@ class Runner(object):
         log_basic_info(return_params)
         return return_params
 
-    def train(self, config, **overwrite_kwargs):
+    def train(self, config: Union[str, Path], **overwrite_kwargs: Dict[str,
+                                                                       Any]):
         param_dict = self.__setup(config, **overwrite_kwargs)
-        config_parameters:Dict = param_dict['params']
-        outputdir:str = param_dict['outputdir']
-        epochs:int = config_parameters['epochs']
-        epoch_length:int = config_parameters['epoch_length']
-        warmup_iters:int = config_parameters['warmup_iters']
-        batch_size:int = config_parameters['batch_size']
-        num_workers:int = config_parameters['num_workers']
+        config_parameters: Dict[str, Any] = param_dict['params']
+        outputdir: str = param_dict['outputdir']
+        epochs: int = config_parameters['epochs']
+        epoch_length: int = config_parameters['epoch_length']
+        warmup_iters: int = config_parameters['warmup_iters']
+        batch_size: int = config_parameters['batch_size']
+        num_workers: int = config_parameters['num_workers']
         kws_batch_size: int = config_parameters.get('kws_batch_size',
                                                     batch_size // 2)
         as_batch_size: int = config_parameters.get('as_batch_size',
@@ -128,10 +130,16 @@ class Runner(object):
             outputdim=num_classes,
             **config_parameters['model_args'])
         logger.info(model)
+
         if pretrained_path is not None:
-            utils.load_pretrained(model,
-                                  trained_model=torch.load(pretrained_path,
-                                                           map_location='cpu'))
+            if 'http' in pretrained_path:
+                pretrained_teacher = torch.hub.load_state_dict_from_url(
+                    pretrained_path
+                )
+            else:
+                utils.load_pretrained(model,
+                                      trained_model=torch.load(
+                                          pretrained_path, map_location='cpu'))
 
         model = model.to(DEVICE).train()
 
@@ -152,8 +160,13 @@ class Runner(object):
             logger.info(f"Using PSL model {psl_model_params['model']}")
             psl_model = getattr(models,
                                 psl_model_params['model'])(outputdim=527)
-            psl_model_dump = torch.load(psl_model_params['pretrained'],
-                                        map_location='cpu')
+            if 'http' in psl_model_params['pretrained']:
+                psl_model_dump = torch.hub.load_state_dict_from_url(
+                    psl_model_params['pretrained']
+                )
+            else:
+                psl_model_dump = torch.load(psl_model_params['pretrained'],
+                                            map_location='cpu')
             psl_model = utils.load_pretrained(psl_model, psl_model_dump)
             psl_model = psl_model.to(DEVICE).eval()
 
@@ -194,13 +207,13 @@ class Runner(object):
                 loss = _forward(x, y, lengths)
                 loss.backward()
                 if max_grad_norm is not None:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                                   max_grad_norm)
                 optimizer.step()
                 return {
                     'total_loss': loss.item(),
                     'lr': optimizer.param_groups[0]['lr'],
                 }
-
 
         def _default_train_batch(engine, batch):
             model.train()
@@ -285,7 +298,7 @@ class Runner(object):
         mAPKWS = utils.ALL_EVAL_METRICS['AP']()[527:].mean()
         mAPKWS.attach(inference_engine, 'mAPKWS')
 
-        as_sampeler_kwargs = {'shuffle':True}
+        as_sampeler_kwargs = {'shuffle': True}
         kws_sampeler_kwargs = {'shuffle': True}
         if as_sampler is not None and as_sampler == 'balanced':
             as_sampeler_kwargs = {
@@ -401,7 +414,7 @@ class Runner(object):
         output_dir = self.train(config, **kwargs)
         from evaluate import Evaluator
         eval = Evaluator()
-        eval.xiaoai_all(output_dir)
+        eval.gsc(output_dir)
         eval.audioset(output_dir)
 
 

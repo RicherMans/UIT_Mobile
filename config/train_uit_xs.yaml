@@ -1,25 +1,27 @@
-outputpath: experiments/superkws
-audioset_train_data: data/balanced_ssd.csv
-kws_train_data: data/train/xiaoai_train.tsv
-audioset_eval_data: data/eval_ssd.csv
-kws_test_data: data/test/test_xiaoai.tsv
-num_classes: 528
+outputpath: experiments/
+audioset_train_data: datasets/audioset/data/labels/balanced.csv
+kws_train_data: datasets/gsc/data/labels/train_gsc_aslabels.tsv
+audioset_eval_data: datasets/audioset/data/labels/eval.csv
+kws_test_data: datasets/gsc/data/labels/test_gsc_aslabels.tsv
+num_classes: 537
 sampler: null
 mixup: null
 batch_size: 32
-optimizer: Adam8bit
+optimizer: AdamW
 optimizer_args:
     lr: 0.001
-    weight_decay: 0.0000005
-epochs: 500
+    weight_decay: 0.00000005
+epochs: 800
 early_stop: 20
-model: audio_transformer_h128_d6_m3_relu
+model: uit_xs
 model_args:
-  target_length: 305
-pretrained: pretrained/audio_transformer_h128_m3_d12_chunk10s_AS.pt
-epoch_length: 10000
-warmup_iters: 1000
-chunk_length: 3.0
+  target_length: 102
+  init_bn: True
+  aug: True
+pretrained: checkpoints/uit_xs_maepretrained.pt
+epoch_length: null
+warmup_iters: 10000
+chunk_length: 1.0
 psl:
   model: MobileNetV2
   pretrained: pretrained/mobilenetv2_dm_mAP42_15.pt

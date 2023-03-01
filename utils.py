@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-import collections
 import sys
 from pathlib import Path
 from pprint import pformat
 from typing import Dict, List, Tuple, Union, Callable
-from functools import partial
 from einops import rearrange
 
 from ignite.metrics import Loss, Precision, Recall, RunningAverage, Accuracy, EpochMetric
@@ -14,16 +11,11 @@ from sklearn.metrics import average_precision_score, label_ranking_average_preci
 
 import numpy as np
 import pandas as pd
-import scipy
-import six
 import torch
-import tqdm
 import yaml
 from loguru import logger
 from torchaudio import transforms as audio_transforms
 import torch_audiomentations as wavtransforms
-
-import dataset
 
 # Some defaults for non-specified arguments in yaml
 DEFAULT_ARGS = {
@@ -153,7 +145,7 @@ ALL_EVAL_METRICS = {
                                 y_pred.to('cpu').numpy(),
                                 average=None)),
                         check_compute_fn=False),
-    
+
     'AP':
     lambda: EpochMetric(lambda y_pred, y_tar: average_precision_score(
         y_tar.to('cpu').numpy(), y_pred.to('cpu').numpy(), average=None),
@@ -204,17 +196,6 @@ def load_pretrained(model: torch.nn.Module, trained_model: dict):
     if 'time_pos_embed' in trained_model.keys():
         pretrained_dict['time_pos_embed'] = trained_model['time_pos_embed']
         pretrained_dict['freq_pos_embed'] = trained_model['freq_pos_embed']
-    # classifier.1 is for Mobilenets, dense for TCN
-    for key in ['classifier.1', 'dense']:
-        # check if the classifier is not loaded yet
-        if (f'{key}.weight' in model_dict) and (f'{key}.weight'
-                                                not in pretrained_dict):
-            logger.info("Partially loading pretrained output weights")
-            weights, bias = load_classifier_from_pretrained(
-                model_dict, trained_model, key)
-            pretrained_dict[f'{key}.weight'] = weights
-            pretrained_dict[f'{key}.bias'] = bias
-            break  #Dont need to continue
 
     logger.info(
         f"Loading {len(pretrained_dict)} Parameters for model {model.__class__.__name__}"
@@ -346,7 +327,8 @@ def read_tsv_data(datafile: str, nrows: int = None, basename=True):
         df['labels'] = df['labels'].apply(lambda x: [int(x)])
     if basename:
         # Just a hack to allow both GSC and audioset in one dataframe ....
-        df['filename'] = df['filename'].apply(lambda x: x if 'Google_Speech_Commands' in x else Path(x).name)
+        df['filename'] = df['filename'].apply(
+            lambda x: x if 'Google_Speech_Commands' in x else Path(x).name)
     return df
 
 
