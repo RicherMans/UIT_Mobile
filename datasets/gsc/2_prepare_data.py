@@ -3,11 +3,6 @@ import pandas as pd
 from pathlib import Path
 import argparse
 
-# Don't like this hacky stuff
-import sys
-path_root = Path(__file__).parent.parent
-sys.path.append(str(path_root))
-
 from utils.dump_audio_to_hdf5 import dump_waves
 
 LABEL_MAPS_GSC_AUDIOSET = {
@@ -101,7 +96,7 @@ output_hdf5.mkdir(exist_ok=True, parents=True)
 
 for dataname, df in all_data_dfs.items():
     output_h5_path = output_hdf5 / f'{dataname}.h5'
-    df['hdf5path'] = output_hdf5.absolute()
+    df['hdf5path'] = output_h5_path.absolute()
     print(
         f"Dumping wav to hdf5 for {dataname} [len {len(df)}] to {output_h5_path}"
     )

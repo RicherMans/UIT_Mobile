@@ -180,10 +180,10 @@ class Runner(object):
                 # calucate the maximum over the two original lengths
                 if lengths is not None:
                     lengths = utils.mixup_lengths(lengths)
-                model_pred, _ = model(x, mixup_lamb)
+                model_pred = model(x, mixup_lamb)
                 y = utils.mixup_single(y, mixup_lamb)
             else:
-                model_pred, _ = model(x)
+                model_pred = model(x)
             return criterion(model_pred, y)
 
         def _train_with_psl(engine, batch):
