@@ -1,0 +1,46 @@
+outputpath: experiments/
+audioset_train_data: datasets/audioset/data/labels/balanced.csv
+kws_train_data: datasets/gsc/data/labels/train_gsc_aslabels.tsv
+audioset_eval_data: datasets/audioset/data/labels/eval.csv
+kws_test_data: datasets/gsc/data/labels/test_gsc_aslabels.tsv
+num_classes: 537
+basename: False
+sampler: null
+mixup: null
+batch_size: 32
+optimizer: AdamW
+optimizer_args:
+    lr: 0.001
+    weight_decay: 0.00000005
+epochs: 800
+early_stop: 50
+model: uit_xxs
+model_args:
+  target_length: 102
+pretrained: https://zenodo.org/record/7690036/files/uit_xs_maepretrained.pt?download=1
+epoch_length: 10000
+warmup_iters: 200000
+chunk_length: 1.0
+psl:
+  model: MobileNetV2
+  pretrained: https://zenodo.org/record/7690036/files/mobilenetv2_dm_mAP42_15.pt?download=1
+loss: BCELoss
+loss_args: {}
+spectransforms:
+    - TimeMasking:
+        time_mask_param: 20
+        iid_masks: True
+    - FrequencyMasking:
+        freq_mask_param: 8
+        iid_masks: True
+    - FrequencyMasking:
+        freq_mask_param: 8
+        iid_masks: True
+wavtransforms:
+  Shift:
+    min_shift: -0.5
+    max_shift: 0.5
+  Gain:
+    p: 0.5
+  PolarityInversion:
+    p: 0.5
