@@ -133,9 +133,11 @@ class Runner(object):
 
         if pretrained_path is not None:
             if 'http' in pretrained_path:
-                pretrained_teacher = torch.hub.load_state_dict_from_url(
+                pretrained_dump = torch.hub.load_state_dict_from_url(
                     pretrained_path
                 )
+                utils.load_pretrained(model,
+                                      trained_model=pretrained_dump)
             else:
                 utils.load_pretrained(model,
                                       trained_model=torch.load(
@@ -237,7 +239,7 @@ class Runner(object):
                 data, targets, lengths, *_ = transfer_to_device(batch)
                 if not use_mask:
                     lengths = None
-                clip_out, _ = model(data)
+                clip_out = model(data)
                 return clip_out, targets
 
         def run_validation(engine, title=None):

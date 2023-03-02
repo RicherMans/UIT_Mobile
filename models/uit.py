@@ -475,7 +475,8 @@ class UITBase(nn.Module):
 
                 # Just crop last step
                 if f.shape[-1] != self.target_length:
-                    # This can only work offline ...
+                    # This can only work offline and is only there for audioset evaluation
+                    # Should otherwise never happen
                     f = x[..., -self.target_length:]
                 outs.append(self.forward_head(self.forward_features(f)))
             x = torch.stack(outs,-1)

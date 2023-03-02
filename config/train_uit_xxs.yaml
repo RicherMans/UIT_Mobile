@@ -17,13 +17,13 @@ early_stop: 50
 model: uit_xxs
 model_args:
   target_length: 102
-pretrained: checkpoints/uit_xs_maepretrained.pt
+pretrained: https://zenodo.org/record/7690036/files/uit_xs_maepretrained.pt?download=1
 epoch_length: 10000
 warmup_iters: 200000
 chunk_length: 1.0
 psl:
   model: MobileNetV2
-  pretrained: checkpoints/mobilenetv2_dm_mAP42_15.pt
+  pretrained: https://zenodo.org/record/7690036/files/mobilenetv2_dm_mAP42_15.pt?download=1
 loss: BCELoss
 loss_args: {}
 spectransforms:

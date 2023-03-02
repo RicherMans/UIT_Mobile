@@ -6,17 +6,22 @@ import argparse
 import models
 
 PRETRAINED_CHECKPOINTS = {
-        'uit_xs': {'model': models.uit.uit_xs,
-                   'model_kwargs': dict(outputdim=537, target_length=102),
-                   'chkpt':'checkpoints/uit_xs_mAP3409.pt'},
-        'uit_xxs': {'model': models.uit.uit_xxs,
-                   'model_kwargs': dict(outputdim=537, target_length=102),
-                   'chkpt':'checkpoints/uit_xxs_mAP3221.pt'},
-        'uit_xxxs': {'model': models.uit.uit_xxxs,
-                   'model_kwargs': dict(outputdim=537, target_length=102),
-                   'chkpt':'checkpoints/uit_xxxs_mAP3097.pt'},
+    'uit_xs': {
+        'model': models.uit.uit_xs,
+        'model_kwargs': dict(outputdim=537, target_length=102),
+        'chkpt': 'https://zenodo.org/record/7690036/files/uit_xs_mAP3409.pt?download=1'
+    },
+    'uit_xxs': {
+        'model': models.uit.uit_xxs,
+        'model_kwargs': dict(outputdim=537, target_length=102),
+        'chkpt': 'https://zenodo.org/record/7690036/files/uit_xxs_mAP3221.pt?download=1'
+    },
+    'uit_xxxs': {
+        'model': models.uit.uit_xxxs,
+        'model_kwargs': dict(outputdim=537, target_length=102),
+        'chkpt': 'https://zenodo.org/record/7690036/files/uit_xxxs_mAP3097.pt?download=1'
+    },
 }
-
 
 
 def main():
@@ -25,7 +30,7 @@ def main():
         'datasets/merged_class_label_indices.csv').set_index(
             'index')['display_name'].to_dict()
     parser = argparse.ArgumentParser()
-    parser.add_argument('input_wav', type=Path, nargs = "+")
+    parser.add_argument('input_wav', type=Path, nargs="+")
     parser.add_argument(
         '-m',
         '--model',
@@ -45,14 +50,17 @@ def main():
 
     if args.model in PRETRAINED_CHECKPOINTS.keys():
         model_params = PRETRAINED_CHECKPOINTS[args.model]
-        dump = torch.load(model_params['chkpt'], map_location='cpu')
+        dump = torch.hub.load_state_dict_from_url(model_params['chkpt'],
+                                                  map_location='cpu')
         model = model_params['model'](**model_params['model_kwargs'])
         model.load_state_dict(dump, strict=True)
     else:
         trained_dump = torch.load(args.model, map_location='cpu')
         model_name = trained_dump['config']['model']
+        num_classes = trained_dump['config'].get('num_classes', 537)
         model_kwargs = trained_dump['config']['model_args']
-        model = trained_dump['config']['model']().load_state_dict(dump, strict=True)
+        model = getattr(models, model_name)(outputdim=num_classes,
+                                            **model_kwargs)
         model.load_state_dict(trained_dump['model'], strict=True)
     model.eval()
 

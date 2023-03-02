@@ -11,11 +11,14 @@ Notable Features:
 * A model delay of 1s, which provides a reasonable user-experience (compared to most transformers in the field).
 * All models are fast on mobile devices and can be used for online audio tagging.
 
-While this Audioset performance seems to be "low" for some people, I'd like to point out that our model is evaluated on *1s crops*, which heavily degrades Audiosets performance.
-To give an idea, if we evaluate [AST](https://github.com/YuanGongND/ast) with the same setting (1s crops), we achieve an mAP of 36.56, about 10 points mAP lower compared to evaluating on 10s.
+While this Audioset performance seems to be "low" for some people, its important to note that UiT is evaluated on *1s crops*, which heavily degrades Audiosets performance.
+To give an idea, if we evaluate [AST](https://github.com/YuanGongND/ast) with the same setting (1s crops), we achieve an mAP of 36.56.
 
 
 ## Dataset acquisition
+
+
+### Audioset
 
 We propose simple preprocessing scripts in `datasets/` for `Audioset` and `GSCV1`.
 For getting the (balanced) Audioset data please run:
@@ -29,12 +32,27 @@ cd datasets/audioset/
 ```
 
 
+### GSCV1
+
+For preparing Google Speech Commands:
+
+```
+bash
+cd datasets/gsc/
+./1_download_gscv1.sh
+# After having downloaded the dataset, dump the .wav to .h5
+python3 2_prepare_data.py
+```
+
+
 
 ## Inference
 
 
-We prepare a simple script to run inference for all three proposed UiT-XS/XXS/XXXS models:
+We prepare a simple script to run inference for all three proposed UiT-XS/XXS/XXXS models.
+The checkpoints are hosted on [zenodo](https://zenodo.org/record/7690036).
 
+Running inference is simple:
 
 ```bash
 python3 inference.py samples/water*
@@ -74,3 +92,52 @@ Water                          0.3668
 Speech                         0.1630
 Bathtub (filling or washing)   0.1135
 ```
+
+An example for KWS:
+
+```bash
+python3 inference.py samples/85b877b5_nohash_0.wav
+
+### Prints:
+#===== samples/85b877b5_nohash_0.wav =====
+#Speech                         1.0000
+#Keyword: on                    0.9999
+#Inside, small room             0.0001
+```
+
+One can change the models (`uit_xxs`, `uit_xxxs`):
+
+```bash
+python3 inference.py -m uit_xxs samples/85b877b5_nohash_0.wav
+
+### Prints:
+#===== samples/85b877b5_nohash_0.wav =====
+#Speech                         0.9999
+#Keyword: on                    0.9885
+#Clicking                       0.0196
+```
+
+## Training
+
+
+After having prepared the data, to train a model just run:
+
+```bash
+# For UiT-XS
+python3 run.py run config/train_uit_xs.yaml
+# For UiT-XXS
+python3 run.py run config/train_uit_xxs.yaml
+# For UiT-XXXS
+python3 run.py run config/train_uit_xxxs.yaml
+```
+
+
+After having trained the model you can use it for inference as:
+
+```bash
+python3 inference.py -m $PATH_TO_YOUR_CHECKPOINT samples/85b877b5_nohash_0.wav
+```
+
+### Evaluation
+
+There is a separate evaluation script:
