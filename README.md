@@ -7,13 +7,20 @@ The aim is to deploy transformer models on mobile devices, which are both capabl
 
 Notable Features:
 
-* Performance of 97.76 on GSCV1 and an mAP of 34.1 on Audioset while only using the balanced training dataset.
+* Performance of 97.76 on GSCV1 and an mAP of 34.1 on Audioset while only using the balanced training dataset. This is a joint model that can do both.
 * A model delay of 1s, which provides a reasonable user-experience (compared to most transformers in the field).
 * All models are fast on mobile devices and can be used for online audio tagging.
 
 While this Audioset performance seems to be "low" for some people, its important to note that UiT is evaluated on *1s crops*, which heavily degrades Audiosets performance.
 To give an idea, if we evaluate [AST](https://github.com/YuanGongND/ast) with the same setting (1s crops), we achieve an mAP of 36.56.
 
+
+## Preparation
+
+```bash
+git clone
+pip3 install -r requirements.txt
+```
 
 ## Dataset acquisition
 
