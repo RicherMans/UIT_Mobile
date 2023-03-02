@@ -141,3 +141,25 @@ python3 inference.py -m $PATH_TO_YOUR_CHECKPOINT samples/85b877b5_nohash_0.wav
 ### Evaluation
 
 There is a separate evaluation script:
+
+```bash
+python3 evaluate.py audioset YOUR_CHECKPOINT
+python3 evaluate.py gsc YOUR_CHECKPOINT
+```
+
+We also provide the results for our own checkpoints:
+
+```bash
+python3 evaluate.py gsc uit_xs
+# Gives
+# [2023-03-02 09:56:36] GSC Results                                                    
+# Accuracy@0.2 : 97.76
+python3 evaluate.py gsc uit_xxs
+# Gives
+# [2023-03-02 09:56:36] GSC Results                                                    
+# Accuracy@0.2 : 97.29
+python3 evaluate.py gsc uit_xxxs
+# Gives
+# [2023-03-02 09:56:36] GSC Results                                                    
+# Accuracy@0.2 : 97.18
+```

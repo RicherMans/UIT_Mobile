@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Tuple
 from ignite.metrics import Accuracy
 import numpy as np
 import torch
@@ -8,14 +8,14 @@ import dataset
 import utils
 from pathlib import Path
 from fire import Fire
+from ignite.engine import Events
 from run import DEVICE, transfer_to_device, create_engine, logger
 import sys
-from ignite.engine import Engine, Events
 
 class Evaluator(object):
 
     def __setup_eval(self, experiment_path):
-        if not hasattr(self,'model'):
+        if not hasattr(self,'model') and Path(experiment_path).exists():
             # Do not reintialize the model of one is already present
             # Just for the case that one uses the _all function
             experiment_path = Path(experiment_path)
@@ -36,6 +36,18 @@ class Evaluator(object):
             self.model = self.model.to(DEVICE).eval()
             self.model = utils.load_pretrained(self.model, model_dump['model'])
             self.config = config_parameters
+        elif experiment_path in models.PRETRAINED_CHECKPOINTS:
+            # For pretrained model evaluation
+            self.config = {}
+            self.num_classes = 537
+            model_params = models.PRETRAINED_CHECKPOINTS[experiment_path]
+            dump = torch.hub.load_state_dict_from_url(model_params['chkpt'],
+                                                      map_location='cpu')
+            self.experiment_path = Path('/tmp/')
+            self.model = model_params['model'](**model_params['model_kwargs'])
+            self.model.load_state_dict(dump, strict=True)
+            self.model.to(DEVICE).eval()
+
         return self
 
     def _inference(self, engine, batch, pad=False) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -50,12 +62,12 @@ class Evaluator(object):
                             (t_len - input_nframes) * self.model.hop_size)
                         data = torch.nn.functional.pad(data, (0, diff),
                                                        mode='constant')
-            clip_out, _ = self.model(data)
+            clip_out = self.model(data)
             return clip_out, targets
 
     def audioset(self,
                  experiment_path: str,
-                 audioset_eval_data: str = 'data/eval_ssd.csv',
+                 audioset_eval_data: str = 'datasets/audioset/data/labels/eval.csv',
                  batch_size=32):
         """audioset.
 
@@ -87,11 +99,15 @@ class Evaluator(object):
                                    'Micro_Recall', 'Micro_F1', 'AP',
                                    'PositiveMultiClass_Accuracy', 'mAP'
                                ])
-        class_labels = 'data/class_labels_indices.csv'
-        label_map_df = pd.read_csv(class_labels)
-        label_map_df['display_name'] = label_map_df['display_name'].str.lower()
-        label_maps = label_map_df.set_index('index')['display_name'].to_dict()
-        engine.state.label_maps = label_maps
+
+        class_labels = Path('datasets/merged_class_label_indices.csv')
+        if class_labels.exists():
+            label_map_df = pd.read_csv(class_labels)
+            label_map_df['display_name'] = label_map_df['display_name'].str.lower()
+            label_maps = label_map_df.set_index('index')['display_name'].to_dict()
+            engine.state.label_maps = label_maps
+        else:
+            engine.state.label_maps = None
         self.__run_eval(engine, dataloader, target='Audioset')
 
     def __run_eval(self,
@@ -169,27 +185,62 @@ class Evaluator(object):
                                                 "Audioset Eval"):
             inference_engine.run(test_dataloader)
 
-    def gsc(
+    def _kws(
             self,
             experiment_path: str,
-            eval_data: str = 'data/gsc_cluster/test_11class.csv',
-            **kwargs
-            ):
-        self.xiaoai(
+            eval_data: str,
+            threshold: float = 0.2,
+            batch_size=32,
+            label_name='GSC',
+            pad: bool = False,  # Padding to target length
+    ):
+        self.__setup_eval(experiment_path)
+        if pad:
+            logger.info("Using Padding")
+        df = utils.read_tsv_data(eval_data,
+                                 basename=self.config.get('basename', False))
+        dataloader = torch.utils.data.DataLoader(
+            dataset.WeakHDF5Dataset(df, num_classes=self.num_classes),
+            batch_size=batch_size,
+            num_workers=4,
+            collate_fn=dataset.sequential_pad)
+
+        def inference_xiaoai(clip_out, targets):
+            clip_out, targets = self._inference(clip_out, targets, pad=pad)
+            return clip_out, targets
+
+        def _output_transform_xiaoai(output):
+            y_pred, y = output
+            mask = torch.ones(y_pred.shape[0],
+                              y_pred.shape[1],
+                              device=y_pred.device)
+            mask[:, :527] = (y_pred[:, :527] == y_pred[:, :527].max(
+                dim=1, keepdim=True)[0]).to(dtype=torch.int32)
+            y_pred = y_pred * mask
+            _, y = y.max(dim=-1)
+            for sample_idx, scores in enumerate(y_pred):
+                max_filer_score_idx = scores[0:527].max(dim=-1)[1]
+                # 更新标注id，如果当前y[sample_idx] < 527, 说明filer标签是随便使用小于527的数标注的
+                if y[sample_idx] < 527:
+                    y[sample_idx] = max_filer_score_idx
+                for score in scores[527:]:
+                    if score >= threshold:
+                        y_pred[sample_idx][max_filer_score_idx] = 0.0
+            return y_pred, y
+
+        engine = create_engine(inference_xiaoai)
+        Accuracy(output_transform=_output_transform_xiaoai).attach(
+            engine, f"Accuracy@{threshold}")
+        self.__run_eval(engine, dataloader, target=label_name)
+
+    def gsc(self,
+            experiment_path: str,
+            eval_data: str = 'datasets/gsc/data/labels/test_gsc_aslabels.tsv',
+            **kwargs):
+        self._kws(
             experiment_path=experiment_path,
             eval_data=eval_data,
             label_name='GSC',
-            **kwargs,
-        )
-
-    def gsc30(self,
-              experiment_path: str,
-              eval_data: str = 'data/gsc/test_30class_singlelabel.csv',
-              **kwargs):
-        self.xiaoai(
-            experiment_path=experiment_path,
-            eval_data=eval_data,
-            label_name='GSC30',
             **kwargs,
         )
 

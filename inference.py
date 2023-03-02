@@ -4,24 +4,8 @@ import torchaudio
 from pathlib import Path
 import argparse
 import models
+from models import PRETRAINED_CHECKPOINTS
 
-PRETRAINED_CHECKPOINTS = {
-    'uit_xs': {
-        'model': models.uit.uit_xs,
-        'model_kwargs': dict(outputdim=537, target_length=102),
-        'chkpt': 'https://zenodo.org/record/7690036/files/uit_xs_mAP3409.pt?download=1'
-    },
-    'uit_xxs': {
-        'model': models.uit.uit_xxs,
-        'model_kwargs': dict(outputdim=537, target_length=102),
-        'chkpt': 'https://zenodo.org/record/7690036/files/uit_xxs_mAP3221.pt?download=1'
-    },
-    'uit_xxxs': {
-        'model': models.uit.uit_xxxs,
-        'model_kwargs': dict(outputdim=537, target_length=102),
-        'chkpt': 'https://zenodo.org/record/7690036/files/uit_xxxs_mAP3097.pt?download=1'
-    },
-}
 
 
 def main():
