@@ -28,7 +28,10 @@ pip3 install -r requirements.txt
 ### Audioset
 
 We propose simple preprocessing scripts in `datasets/` for `Audioset` and `GSCV1`.
-For getting the (balanced) Audioset data please run:
+
+
+For getting the (balanced) Audioset data you need (gnu-parallel)[https://www.gnu.org/s/parallel] and (yt-dlp)[https://github.com/yt-dlp/yt-dlp].
+Downloading the balanced audioset is quick ( for me takes about 30 minutes):
 
 ```
 bash
