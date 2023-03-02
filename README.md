@@ -18,7 +18,7 @@ To give an idea, if we evaluate [AST](https://github.com/YuanGongND/ast) with th
 ## Preparation
 
 ```bash
-git clone
+git clone https://github.com/RicherMans/UIT_Mobile
 pip3 install -r requirements.txt
 ```
 
