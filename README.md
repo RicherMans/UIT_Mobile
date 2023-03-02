@@ -11,7 +11,7 @@ Notable Features:
 * A model delay of 1s, which provides a reasonable user-experience (compared to most transformers in the field).
 * All models are fast on mobile devices and can be used for online audio tagging.
 
-While this Audioset performance seems to be "low" for some people, its important to note that UiT is evaluated on *1s crops*, which heavily degrades Audiosets performance.
+While the Audioset performance appears to be not at SOTA-levels, its important to note that UiT is evaluated on *1s crops*, which heavily degrades Audiosets performance.
 To give an idea, if we evaluate [AST](https://github.com/YuanGongND/ast) with the same setting (1s crops), we achieve an mAP of 36.56.
 
 
