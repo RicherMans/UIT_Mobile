@@ -1,13 +1,13 @@
 audioread==2.1.9
 bitsandbytes==0.35.4
-einops==0.6.0
-fire==0.5.0
+einops
+fire
 h5py==3.7.0
 ignite==1.1.0
 loguru==0.6.0
 numpy==1.24.1
 pandas==1.5.3
-pytorch_ignite==0.4.10
+pytorch_ignite
 PyYAML==6.0
 scikit_learn==1.2.1
 SoundFile==0.10.3.post1
@@ -17,3 +17,4 @@ torch_audiomentations==0.11.0
 torchaudio==0.13.0
 torchinfo==1.7.0
 tqdm==4.64.1
+yt-dlp
