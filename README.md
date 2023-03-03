@@ -7,6 +7,7 @@ The aim is to deploy transformer models on mobile devices, which are both capabl
 
 Notable Features:
 
+* We propose three pico-sized models, based on ViT, which are optimized for speed and real-world deployment.
 * Performance of 97.76 on GSCV1 and an mAP of 34.1 on Audioset while only using the balanced training dataset. This is a joint model that can do both keyword spotting and Audio tagging.
 * A model delay of 1s, which provides a reasonable user-experience (compared to most transformers in the field).
 * All models are fast on mobile devices and can be used for online audio tagging.
