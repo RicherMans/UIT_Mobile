@@ -12,7 +12,7 @@ Notable Features:
 * A model delay of 1s, which provides a reasonable user-experience (compared to most transformers in the field).
 * All models are fast on mobile devices and can be used for online audio tagging.
 
-The results for speed are (using TC-Resnet8 as a KWS speed topline and MobileNetV2 as an Audio tagging baseline):
+We evaluated all three proposed UiT models on differnt mobile hardware, where TC-Resnet8 is a KWS "speed topline" and MobileNetV2 is an an Audio tagging baseline:
 
 
 | Model      | SD865 | SD888 | G90T | MT700 |
