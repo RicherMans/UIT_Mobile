@@ -11,6 +11,18 @@ Notable Features:
 * A model delay of 1s, which provides a reasonable user-experience (compared to most transformers in the field).
 * All models are fast on mobile devices and can be used for online audio tagging.
 
+The results for speed are (using TC-Resnet8 as a KWS speed topline and MobileNetV2 as an Audio tagging baseline):
+
+
+| Model      | SD865 | SD888 | G90T | MT700 |
+|------------|-------|-------|------|-------|
+| TC-ResNet8 | 0.4   | 0.4   | 1.1  | 1.1   |
+| MBv2       | 8.0   | 6.2   | 13.1 | 11.6  |
+| Uit-XS     | 3.4   | 3.4   | 7.3  | 7.1   |
+| UiT-2XS    | 1.7   | 1.5   | 2.8  | 3.2   |
+| UiT-3XS    | 1.2   | 1.1   | 2.2  | 2.2   |
+
+
 While the Audioset performance appears to be not at SOTA-levels, its important to note that UiT is evaluated on *1s crops*, which heavily degrades Audiosets performance.
 To give an idea, if we evaluate [AST](https://github.com/YuanGongND/ast) with the same 1s crops, we achieve an mAP of 36.56 and [CNN14](https://github.com/qiuqiangkong/audioset_tagging_cnn) achieves 38.55.
 
