@@ -25,6 +25,7 @@ The results for speed are (using TC-Resnet8 as a KWS speed topline and MobileNet
 
 While the Audioset performance appears to be not at SOTA-levels, its important to note that UiT is evaluated on *1s crops*, which heavily degrades Audiosets performance.
 To give an idea, if we evaluate [AST](https://github.com/YuanGongND/ast) with the same 1s crops, we achieve an mAP of 36.56 and [CNN14](https://github.com/qiuqiangkong/audioset_tagging_cnn) achieves 38.55.
+Both of the mentioned models were trained on the *full* Audioset dataset.
 
 
 ## Preparation
