@@ -47,8 +47,7 @@ We propose simple preprocessing scripts in `datasets/` for `Audioset` and `GSCV1
 For getting the (balanced) Audioset data you need (gnu-parallel)[https://www.gnu.org/s/parallel] and (yt-dlp)[https://github.com/yt-dlp/yt-dlp].
 Downloading the balanced audioset is quick ( for me takes about 30 minutes):
 
-```
-bash
+```bash
 cd datasets/audioset/
 ./1_download_audioset.sh
 # After having downloaded the dataset, dump the .wav to .h5
@@ -60,8 +59,7 @@ cd datasets/audioset/
 
 For preparing Google Speech Commands:
 
-```
-bash
+```bash
 cd datasets/gsc/
 ./1_download_gscv1.sh
 # After having downloaded the dataset, dump the .wav to .h5
