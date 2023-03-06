@@ -1,7 +1,7 @@
 # Unified Keyword Spotting and Audio Tagging on Mobile Devices with Transformers
 
 
-This repository contains the source code for the ICASSP 2023 Paper "Unified Keyword Spotting and Audio Tagging on Mobile Devices with Transformers".
+This repository contains the source code for the ICASSP 2023 Paper [Unified Keyword Spotting and Audio Tagging on Mobile Devices with Transformers](https://arxiv.org/abs/2303.01812).
 The aim is to deploy transformer models on mobile devices, which are both capable as a keyword spotter and a audio tagger.
 
 
